@@ -1,0 +1,4 @@
+Model,Full (30 PCs),Reduced (10 PCs),Difference
+Random Forest,0.9815,0.9877,-0.0062
+SVM,0.9662,0.9662,+0.0000
+Neural Network,0.9785,0.9908,-0.0123
