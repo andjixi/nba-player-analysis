@@ -1,0 +1,666 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{fullpage}
+\usepackage[T1]{fontenc}
+\usepackage[serbian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{csquotes}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=cyan, citecolor=blue}
+
+\begin{document}
+
+\title{Analiza NBA Igrača Kroz Eksploraciju Podataka \\
+\small{Primena Naprednih Tehnika Istraživanja Podataka na NBA Draft Combine Statistike\\ Matematički fakultet}}
+\author{Anđela Jovanović \\ mi251035@alas.matf.bg.ac.rs }
+\date{Januar 2026.}
+
+\maketitle
+
+\begin{abstract}
+Ovaj rad analizira NBA Draft Combine statistike primenom mašinskog učenja i statističkih metoda. Na osnovu spajanja tri izvora podataka formiran je skup sa 61 karakteristikom i 1.202 igrača. Identifikovana su dva dominantna fizička arhetipa uz tačnost klasifikacije veću od 98\%, kao i 129 asocijativnih pravila između fizičkih karakteristika. Takođe, pokazano je da 10 glavnih komponenti objašnjava 90\% varijanse podataka, što ukazuje na visoku redundanciju merenja.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Uvod}
+\label{sec:uvod}
+
+\subsection{Kontekst i Motivacija}
+\label{subsec:kontekst_i_motivacija}
+
+NBA Draft Combine je godišnji događaj gde se košarkaši podvrgavaju standardizovanim fizičkim i atletskim testovima. Ova merenja pružaju skautima i timovima objektivne podatke za evaluaciju kandidata, ali sa preko 50 različitih metrika, sama količina informacija može biti opterećujuća. Kako prepoznati koje karakteristike definišu uspešnog košarkaša? Koje kombinacije fizičkih atributa idu zajedno, a koje su retke i potencijalno vredne?
+\vspace{2pt}
+
+U periodu kada se odluke vredne milione dolara donose na osnovu ovih merenja, NBA timovi se susreću sa bitnim pitanjima. Nije dovoljno samo pogledati da li je igrač visok ili koliko brzo trči, potrebno je razumeti složene odnose između visine i agilnosti, snage i eksplozivnosti, veličine i brzine. Postoje li prirodne grupe igrača koje diktiraju različite stilove igre? Može li se iz fizičkih merenja predvideti na kojoj poziciji će igrač biti najkorisniji? I možda najvažnije - koji igrači predstavljaju statistički izuzetak koji može signalizirati potencijalni izuzetan talent?
+\vspace{2pt}
+
+Tradicionalni pristupi evaluaciji često se oslanjaju na iskustvo skauta i intuiciju, što ima svoju vrednost, ali nosi i rizik subjektivnosti. Ovaj projekat pokušava da dopuni taj proces sistematskim pristupom zasnovanim na mašinskom učenju i statističkoj analizi, kako bi iz podataka izvukli objektivne obrasce koji mogu pomoći u donošenju boljih odluka.
+
+\subsection{Skup Podataka}
+\label{subsec:skup_podataka}
+
+Za potrebe ove analize korišćen je skup podataka preuzet sa Kaggle platforme \cite{walsh2024nba}, koji obuhvata višegodišnje statistike NBA Draft Combine događaja. Finalni skup podataka je rezultat spajanja 1.202 igrača sa 61 karakteristikom, obuhvatajući period od 2000. do 2024. godine.
+
+\begin{table}[H]
+\centering
+\large
+\begin{tabular}{ll}
+\toprule
+\textbf{Atribut} & \textbf{Vrednost} \\
+\midrule
+Izvor & NBA baza podataka (Kaggle) \\
+Broj zapisa & 1.202 igrača (nakon spajanja) \\
+Broj karakteristika & 61 kolona \\
+Vremenski period & Više sezona (2000-2024) \\
+Tipovi podataka & Numerički, kategorički, vremenski \\
+\bottomrule
+\end{tabular}
+\caption{Pregled skupa podataka}
+\label{table:pregled_skupa}
+\end{table}
+
+\newpage
+\section{Analiza skupa podataka}
+\label{sec:analiza_skupa_podataka}
+
+\subsection{Priprema Podataka}
+\label{subsec:priprema_podataka}
+
+Polaznu tačku ove analize čine tri odvojena skupa podataka iz NBA baze, koji zajedno pružaju kompletan pregled fizičkih karakteristika, draft istorije i biografskih informacija igrača. 
+\vspace{2pt}
+
+Prvi i najvažniji je skup statistika sa probnog kampa za draft\footnote{Draft Combine - godišnji događaj gde se potencijalni NBA igrači podvrgavaju standardizovanim testovima} koji sadrži sve fizičke testove od osnovnih merenja poput visine i težine, preko atletskih testova kao što su vertikalni skok i trčanje na kratke staze, do specifičnijih merenja kao što su raspon ruku i veličina šake. Ovaj skup čini osnovu analize jer dokumentuje direktna fizička merenja 1.202 igrača kroz 47 različitih kolona.
+\vspace{2pt}
+
+Drugi skup, istorija izbora na draftu, donosi kontekst o tome kako su ovi igrači procenjeni od strane NBA timova to jest u kojoj rundi i na kojem mestu su izabrani, od strane kog tima. Ove informacije su ključne jer omogućavaju da se ispita da li fizičke karakteristike zaista predviđaju kako će skauti rangirati igrače. 
+\vspace{2pt}
+
+Konačno, treći skup sa opštim informacijama o igračima dodaje biografski kontekst kroz podatke o datumu rođenja, univerzitetu ili inostranoj ligi iz koje dolaze, i zemlji porekla.
+\vspace{2pt}
+
+Spajanjem ovih tabela preko jedinstvenog identifikatora igrača dobijen je skup podataka od 1.202 zapisa sa 61 kolonom. Međutim, kvalitet podataka je predstavljao najveći izazov jer mnoge kolone su imale značajan broj nedostajućih vrednosti. Odlučeno je da se kolone sa više od 70\% nedostajućih podataka uklone iz analize, jer bi njihova analiza bila statistički nepouzdana i mogla dovesti do pogrešnih zaključaka. Ovo je posebno uticalo na metrike šutiranja, koje su često bile nedostupne jer mnogi igrači ne učestvuju u tim testovima, bilo zbog povreda, saveta svojih agenata, ili zato što nisu bili pozvani na kompletno testiranje.
+
+Za preostale nedostajuće vrednosti primenjena je strategija popunjavanja medijanom. Ova metoda je odabrana umesto proseka jer je medijana otpornija na ekstremne vrednosti koje su česte u sportskim podacima.
+
+\subsection{Eksplorativna Analiza Podataka}
+\label{subsec:eda}
+
+Pre primene složenih algoritama mašinskog učenja, bilo je neophodno razumeti strukturu i distribuciju samih podataka. Početna eksplorativna analiza je otkrila zanimljive obrasce koji potvrđuju da se radi o specijalnoj populaciji - elitnim sportistima, a ne opštoj populaciji.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/physical_characteristics_distribution.png}
+\caption{Distribucije ključnih fizičkih karakteristika}
+\label{fig:eda}
+\end{figure}
+
+Slika \ref{fig:eda} prikazuje distribucije ključnih fizičkih merenja i odmah su vidljivi određeni obrasci. Većina distribucija prati normalnu raspodelu, što je dobar znak za kvalitet podataka i kasnije statističke analize. Ovo nije iznenađujuće jer visina, težina i slične biološke karakteristike prirodno prate normalnu distribuciju u velikim populacijama, čak i kada se radi o vrhunskim sportistima.
+\vspace{2pt}
+
+Visina sa patikama se koncentriše oko 79-80 inča ($\approx 201\ \text{cm}$) što je očekivano za NBA igrače. Međutim, interesantno je da su same granice prihvatljivosti relativno uske, budući da se većina igrača nalazi u opsegu od 75 do 85 inča (190–215 cm).Ovo govori o tome da NBA ima određene \enquote{ulazne standarde} što se tiče visine, izuzimajući retke izuzetke.
+\vspace{2pt}
+
+Težina pokazuje širu distribuciju jer se kreće od oko 175 do 275 lbs ($\approx 80-125\ \text{kg}$), što pokazuje veliku raznolikost u tipovima igrača - od brzih, lakih bekova\footnote{Bek (eng. guard) - spoljni igrač zadužen za organizaciju igre i šutiranje sa veće distance} do masivnih centara\footnote{Centar (eng. center) - najviši igrač u timu, zadužen za igru pod košem, skokove i blokade}. Raspon ruku takođe pokazuje normalnu distribuciju sa blagom asimetrijom ka većim vrednostima, što ima smisla jer se NBA timovi često fokusiraju na igrače sa dugim rukama koji mogu pokrivati veći prostor na terenu.
+\vspace{2pt}
+
+\subsection{Korelaciona Analiza}
+\label{subsec:korelaciona_analiza}
+
+Nakon razumevanja pojedinačnih distribucija, sledeći korak je bio ispitati kako karakteristike međusobno koreliraju. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/correlation_matrix.png}
+\caption{Korelaciona matrica}
+\label{fig:korelaciona_matrica}
+\end{figure}
+
+Najveće pozitivne korelacije postoje između različitih merenja veličine kao što su visina bez patika, visina sa patikama, raspon ruku i doseg u stojećem položaju. Ove korelacije su vrlo jake, često prelaze 0.7, što je razumljivo jer su sve determinisane osnovnom skeletnom strukturom i genetikom. Međutim, jačina ovih korelacija kod NBA igrača je zapravo veća nego u opštoj populaciji, što sugeriše da NBA regrutuje morfološki homogeniju grupu igrača.
+\vspace{2pt}
+
+Ono što je još interesantnije su pozitivne korelacije između veličine i testova agilnosti. Veći, teži igrači su statistički sporiji u testovima trčanja na kratke staze i imaju duža vremena u testovima agilnosti. Ovo otkriva fundamentalni kompromis u košarci: dobijate na fizičkoj prisutnosti i dometu, ali gubite na brzini i pokretljivosti. Ovaj princip objašnjava zašto postoje različite pozicije u košarci jer sport zahteva i velike igrače koji dominiraju pod košem, i brze igrače koji kontrolišu tempo i spoljašnji deo terena.
+\vspace{2pt}
+
+Neočekivan nalaz je da rezultati u testu potiska sa klupe\footnote{Potisak sa klupe (eng. bench press) - test snage gornjeg dela tela gde igrač podiže tegove ležeći na klupi} pokazuju vrlo slabe korelacije sa gotovo svim ostalim varijablama, uključujući visinu i težinu. Ovo sugeriše da je snaga gornjeg dela tela relativno nezavisna karakteristika koja varira među igračima bez obzira na njihovu građu.
+\vspace{2pt}
+
+Možda najzanimljiviji uvid dolazi iz analize draft pozicije. Varijable poput \texttt{overall\_pick} (ukupna pozicija izbora) i \texttt{round\_pick} (pozicija izbora u rundi) pokazuju slabe korelacije sa fizičkim merenjima, što ukazuje da NBA timovi pri odabiru igrača ne pridaju presudnu važnost fizičkim atributima. Veština, košarkaški IQ i procenjeni potencijal očigledno imaju veću ulogu u procesu drafta.
+
+\vspace{20pt}
+\section{Detekcija Anomalija}
+\label{sec:detekcije_anomalija}
+
+Pre nego što krenemo sa grupisanjem igrača u prirodne kategorije, bilo je važno identifikovati statističke izuzetke, to jest igrače čije kombinacije fizičkih karakteristika ne odgovaraju tipičnim obrascima. Za ovo su korišćene dve metode: Isolation Forest \cite{liu2008isolation}\footnote{Isolation Forest - algoritam za detekciju anomalija zasnovan na izolaciji tačaka pomoću stabala odlučivanja} i Local Outlier Factor\footnote{Local Outlier Factor (LOF) - algoritam koji identifikuje anomalije na osnovu lokalne gustine tačaka u prostoru}, koje pristupaju problemu iz različitih perspektiva ali su dale veoma konzistentne rezultate.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metoda} & \textbf{Parametri} & \textbf{Broj netipičnih vrednosti} & \textbf{Procenat (\%)} \\
+\midrule
+Isolation Forest & Kontaminacija = 0.10 & 121 & 10.07 \\
+Local Outlier Factor (LOF) & 20 suseda, kontaminacija = 0.10 & 121 & 10.07 \\
+\bottomrule
+\end{tabular}
+\caption{Rezultati detekcije anomalija}
+\label{table:detekcije_anomalija}
+\end{table}
+
+Obe metode su identifikovale 121 igrača, odnosno 10.07\% ukupne populacije, kao netipične vrednosti. Ova konzistentnost između dva različita algoritma povećava poverenje u rezultate. Ali ko su zapravo ovi igrači i šta znači biti netipična vrednost u NBA kontekstu?
+\vspace{2pt}
+
+U većini analiza podataka, netipične vrednosti se smatraju greškama ili šumom koji treba ukloniti. Međutim, u sportu, a posebno u NBA-u, netipične vrednosti mogu biti izuzetno vredni. Ovo su igrači sa jedinstvenim kombinacijama fizičkih karakteristika - možda izuzetno visok igrač koji je neuobičajeno brz, ili relativno nizak igrač sa nenormalnim rasponom ruku, ili centar sa agilnošću beka.
+\vspace{2pt}
+
+Ovi profili mogu predstavljati dva scenarija. Prvi scenario je pozitivan i reč je o potencijalnim zvezdama, igračima koji prevazilaze tradicionalne pozicione okvire i imaju potencijal da transformišu način igre. Kevin Durant, na primer, kombinuje visinu centra sa veštinama beka, što ga čini statističkom anomalijom ali i jednim od najboljih igrača svoje generacije. Drugi scenario je rizičniji jer su ovo igrači koji ne odgovaraju nijednom utvrđenom profilu i mogu imati poteškoća da pronađu svoju ulogu u timu.
+\vspace{2pt}
+
+Za ostatak analize, ovih 121 igrača je isključeno kako bi se fokus stavio na \enquote{tipičnu} populaciju od 1.081 igrača. Ovo omogućava jasnije definisane klastere i robusnije statističke zaključke o reprezentativnim profilima. Međutim, vrednost identifikacije ovih netipičnih vrednosti ne treba zanemariti jer za NBA tim koji traži \enquote{sledeću veliku stvar}, upravo ovi igrači mogu biti najveća prilika.
+
+\newpage
+\section{Redukcija Dimenzionalnosti}
+\label{sec:redukcija_dimenzionalnosti}
+
+\subsection{Analiza Glavnih Komponenti (PCA)}
+\label{subsec:pca}
+
+Sa 17 različitih numeričkih fizičkih karakteristika u skupu podataka, vizualizacija i razumevanje strukture podataka postaje izazovno. Tu nastupa analiza glavnih komponenti (eng. Principal Component Analysis - PCA), tehnika koja transformiše te karakteristika u novi skup nekorelisanih glavnih komponenti, rangirajući ih po tome koliko varijanse u podacima objašnjavaju.
+\vspace{2pt}
+
+Kada je PCA primenjena na naših 1.081 igrača, rezultati su bili zanimljivi i praktično veoma korisni. Prva glavna komponenta (PC1) sama po sebi objašnjava 31.69\% ukupne varijanse u svim merenjima. Dodavanjem druge komponente (PC2) koja doprinosi dodatnih 12.48\%, dolazimo do ukupno 44.17\% varijanse objašnjene sa samo dve dimenzije. Ali još impresivnije je da svega 10 komponenti objašnjava 90\% ukupne varijanse.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Metrika} & \textbf{Vrednost} \\
+\midrule
+Broj komponenti za 90\% varijanse & 10 \\
+Broj komponenti za 95\% varijanse & 11 \\
+Varijansa prve komponente (PC1) & 31.69\% \\
+Varijansa druge komponente (PC2) & 12.48\% \\
+Varijansa treće komponente (PC3) & 10.78\% \\
+Varijansa četvrte komponente (PC4) & 7.49\% \\
+Varijansa pete komponente (PC5) & 6.94\% \\
+\bottomrule
+\end{tabular}
+\caption{PCA rezultati prvih pet kompoennti}
+\label{table:pca_rezultati}
+\end{table}
+
+Možemo se fokusirati na 10 ključnih dimenzija sa gubitkom od samo 10\% informacija. Ovo predstavlja redukciju od 67\% uz minimalan gubitak, što direktno sugeriše da postoji ogromna redundancija u trenutnim NBA Draft Combine merenjima.
+
+\subsection{Interpretacija Glavnih Komponenti}
+\label{subsec:interpretacija_pc}
+
+PCA takođe omogućava interpretaciju ovih komponenti analizom težinskih koeficijenata (eng. loadings) - doprinosa originalnih karakteristika svakoj komponenti pa možemo razumeti šta svaka komponenta zapravo predstavlja.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/pca_loadings_visualization.png}
+\caption{Doprinosi originalnih karakteristika prvim dvema glavnim komponentama}
+\label{fig:pca_loadings}
+\end{figure}
+
+Na slici \ref{fig:pca_loadings} možemo videti da je prva komponenta, PC1, gotovo u potpunosti definisana merama fizičke veličine gde najveće pozitivne doprinose daju doseg u stoju, visina sa i bez patika, raspon ruku i težina. Na suprotnom kraju, negativne doprinose imaju testovi agilnosti i vremena u trčanju na kratke staze. Ovo nam govori da PC1 zapravo meri spektar \enquote{veliki i spori} nasuprot \enquote{mali i brzi}. 
+\vspace{2pt}
+
+Druga komponenta, PC2, priča drugačiju priču. Ovde dominiraju merenja eksplozivnosti i snage kao što su vertikalni skok (iz mesta i maksimalni), potisak sa klupe, i širina šake. Ova komponenta meri atletizam nezavisno od veličine. Dva igrača mogu biti iste visine (neutralni na PC1), ali jedan može biti mnogo eksplozivniji (pozitivan na PC2). 
+\vspace{2pt}
+
+Ove dve dimenzije zajedno objašnjavaju preko 44\% ukupne varijanse i odgovaraju intuitivnim pitanjima koja se postavljaju o košarkašima: \enquote{Koliko si visoki?} (PC1) i \enquote{Koliko si atletičan?} (PC2). 
+
+\subsection{Vizualizacija u Redukovanom Prostoru}
+\label{subsec:pca_viz}
+
+Sa redukcijom na 2 dimenzije, konačno možemo videti celokupan skup podataka i početi da vidimo obrasce koji bi inače bili sakriveni u višedimenzionalnom prostoru.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/pca_2d_projection.png}
+\caption{2D PCA projekcija sa prve dve glavne komponente}
+\label{fig:pca_2d}
+\end{figure}
+
+Slika \ref{fig:pca_2d} prikazuje svih 1.081 igrača kao tačke u prostoru PC1 i PC2. Nešto što odmah upada u oči je da nema oštrih granica ili jasno razdvojenih klastera već vidimo kontinuiran oblak tačaka. 
+\vspace{2pt}
+
+Ovaj kontinuitet je važan nalaz jer sugeriše da podela pozicija u košarci nije binarni kategorija već fluidni spektar. Nema jasne linije gde prestaje bek a počinje krilo već postoje granični slučajevi, hibridi, igrači koji mogu igrati više pozicija. Ovo odražava modernu košarku gde su tradicionalne pozicije sve manje rigidne.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/pca_3d_visualization.png}
+\caption{3D PCA vizualizacija sa K-Means klasterima (k=2)}
+\label{fig:pca_3d}
+\end{figure}
+
+Dodavanjem treće dimenzije (PC3, koja doprinosi dodatnih 10.78\% varijanse), dobijamo potpuniju sliku. Slika \ref{fig:pca_3d} prikazuje podatke u 3D prostoru gde su igrači obojeni prema klasterima koje će K-Means algoritam kasnije identifikovati. (Pogledati Sekciju \ref{subsec:kmeans}) Već ovde možemo videti da se formiraju dve glavne grupe, jedna crvena (veći igrači) i jedna plava (perimetralni igrači), ali sa značajnim preklapanjem u srednjoj zoni. Ovo preklapanje su upravo oni igrači koji mogu funkcionisati u više uloga, poznatiji i kao igrači na više pozicija\footnote{Swingman - igrač koji može igrati na dve ili više pozicija, najčešće na pozicijama beka šutera i niskog krila}.
+
+\newpage
+\subsection{t-SNE: Alternativna Perspektiva}
+\label{subsec:tsne}
+
+PCA je moćna tehnika, ali ona je linearna transformacija. Šta ako odnosi između igrača nisu linearni? Šta ako postoje kompleksnije strukture koje PCA ne može uhvatiti zbog svoje prirode?
+\vspace{2pt}
+
+Za istraživanje ove mogućnosti, primenjena je t-SNE \cite{vandermaaten2008visualizing}\footnote{t-distributed Stochastic Neighbor Embedding} tehnika. Ona se fokusira na očuvanje lokalnih struktura gde pokušava da igrače koji su slični u višedimenzionalnom prostoru drži blizu i u 2D projekciji, čak i ako ta bliskost nije linearna.
+\vspace{2pt}
+
+t-SNE algoritam radi kroz iterativni proces koji započinje sa slučajnom projekcijom tačaka u 2D prostor, a zatim ih postepeno pomera tako da lokalne strukture budu očuvane. Ovo znači da dva igrača sa sličnim fizičkim profilima u originalnom prostoru treba da budu blizu i na t-SNE vizualizaciji, nezavisno od toga da li je ta sličnost vezana za linearnu kombinaciju karakteristika.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/tsne_visualization.png}
+\caption{t-SNE vizualizacija NBA igrača}
+\label{fig:tsne_viz}
+\end{figure}
+
+Slika \ref{fig:tsne_viz} prikazuje rezultat t-SNE projekcije primenjen na naših 1.081 igrača. Za razliku od PCA vizualizacije gde vidimo kontinualan oblak tačaka sa postepenim prelazom, t-SNE otkriva \enquote{ostrva} igrača sa sličnim karakteristikama i jasnije definisane granice između različitih grupa. Algoritam je uspeo da otkrije lokalne gustine koje odgovaraju različitim podtipovima igrača unutar širih kategorija.
+\vspace{2pt}
+
+Ovo ne znači da je t-SNE bolja od PCA već jednostavno prikazuje druge aspekte strukture podataka. 
+
+\newpage
+\section{Klasterovanje}
+\label{sec:klasterovanje}
+
+\subsection{Određivanje Optimalnog Broja Klastera}
+\label{subsec:optimalan_k}
+
+Sa jasnom slikom podataka u redukovanom prostoru, sledeći korak je bio formalizovati grupisanje igrača u prirodne arhetipove. Ali prvo pitanje je bilo koliko ima tih arhetipova? Da li košarkaši prirodno padaju u dve kategorije (veliki vs. mali), tri (odgovarajući pozicijama bek-krilo-centar), ili možda pet (po tradicionalnim pozicijama: plejmejker, bek šuter, nisko krilo, krilni centar, centar\footnote{Tradicionalne košarkaške pozicije: plejmejker (eng. point guard - PG) - organizator igre; bek šuter (eng. shooting guard - SG) - spoljni šuter; nisko krilo (eng. small forward - SF) - svestrani igrač; krilni centar (eng. power forward - PF) - snažniji krilni igrač; centar (eng. center - C) - igrač pod košem})?
+\vspace{2pt}
+
+Za odgovor na ovo pitanje korišćene su dve komplementarne tehnike: metoda lakta (eng. Elbow method) i analiza siluete \cite{rousseeuw1987silhouettes} (eng. Silhouette analysis). Algoritam K-Means je pokretan za vrednosti k od 2 do 10, i za svaku vrednost su izračunate metrike kvaliteta klasterovanja.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/clustering_elbow_silhouette.png}
+\caption{Metoda lakta i skor siluete za različite vrednosti k}
+\label{fig:elbow_silhouette}
+\end{figure}
+
+Slika \ref{fig:elbow_silhouette} prikazuje rezultate. Na levom grafiku, \textit{\textbf{metoda lakta}} pokazuje kako inercija (suma kvadratnih odstojanja tačaka od njihovih najbližih centroida) opada sa povećanjem broja klastera. Tačka pregiba gde dalje povećanje broja klastera ne donosi proporcionalno poboljšanje se javlja već na k=2, možda k=3. Ovo sugeriše da dodatni klasteri nakon ovoga ne donose mnogo novih informacije.
+\vspace{2pt}
+
+Desni grafik, analiza siluete, potvrđuje ovaj nalaz još jasnije. \textit{\textbf{Skor siluete}} meri koliko je svaki igrač sličniji igračima u svom klasteru nego igračima u drugim klasterima. Vrednosti blizu 1 znače odlično klasterovanje, blizu 0 znače preklapanje, a negativne vrednosti znače da je igrač verovatno pogrešno dodeljen. Najviši skor (0.184) je postignut tačno na k=2. Sa povećanjem k, skor opada, što znači da forsiranje više klastera zapravo pogoršava kvalitet grupisanja.
+\vspace{2pt}
+
+Vrednost od 0.1832 je zapravo realistična vrednost jer fizičke karakteristike variraju kontinualno, ne u diskretnim kategorijama. Nije kao da postoje dva potpuno odvojena tipa ljudi već umesto toga postoji spektar, ali sa dva jasna \enquote{vrha} oko kojih se igrači grupišu. 
+
+\subsection{K-Means Klasterovanje sa k=2}
+\label{subsec:kmeans}
+
+Na osnovu gornje analize, K-Means je pokrenut sa k=2, što je dalo jasnu podelu populacije:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Klaster} & \textbf{Broj igrača} & \textbf{Procenat} \\
+\midrule
+Klaster 0  & 512 & 47.4\% \\
+Klaster 1  & 569 & 52.6\% \\
+\bottomrule
+\end{tabular}
+\caption{Distribucija igrača po klasterima}
+\label{table:distribucija_po_klasterima}
+\end{table}
+
+Podela je gotovo ravnomerna gde 47.4\% populacije pada u jednu grupu, a 52.6\% u drugu. 
+
+\begin{figure}[H]
+\centering
+\hspace*{-1.3cm}
+\includegraphics[width=1.2\textwidth]{figures/kmeans_clustering_visualization.png}
+\caption{K-Means klasteri vizualizovani u PCA i t-SNE prostoru}
+\label{fig:kmeans_viz}
+\end{figure}
+
+Slika \ref{fig:kmeans_viz} pokazuje ove klastere iz dve perspektive. Na levoj strani, PCA projekcija jasno pokazuje razdvajanje klastera duž PC1 ose, što je očekivano jer smo već videli da PC1 meri \enquote{veličinu}. Klasteri se manje razlikuju duž PC2 ose (atletizam), što sugeriše da oba arhetipa imaju podjednako velike raspone u atletskim sposobnostima.
+\vspace{2pt}
+
+Desna strana koristi t-SNE, drugu tehniku redukcije dimenzionalnosti koja je fokusirana na očuvanje lokalne strukture. Za razliku od PCA prikaza, t-SNE jasnije razdvaja klastere u kompaktne grupe, što potvrđuje da algoritam zaista prepoznaje dve distinktne populacije igrača. 
+\vspace{2pt}
+
+Matematika je identifikovala dva klastera, ali da bismo razumeli šta oni predstavljaju potrebno je pogledati prosečne vrednosti fizičkih merenja za svaki klaster:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Karakteristika} & \textbf{Klaster 1} & \textbf{Klaster 0} & \textbf{Razlika} \\
+\midrule
+Visina (sa patikama, cm) & 204.97 & 195.15 & +9.82 \\
+Težina (kg) & 103.95 & 89.67 & +14.28 \\
+Raspon ruku (cm) & 215.50 & 202.94 & +12.56 \\
+Vert. skok (cm) & 84.72 & 91.69 & -6.97 \\
+Agilnost (sek) & 11.56 & 11.14 & +0.42 \\
+\bottomrule
+\end{tabular}
+\caption{Prosečne vrednosti fizičkih karakteristika po klasterima}
+\end{table}
+
+Vidimo da Klaster 0 obuhvata prosečno oko 10 cm više igrače, koji su takođe teži za oko 14 kg i imaju raspon ruku duži za 12.56 cm prosečno. Ovo su klasični \enquote{veliki igrači} koji dominiraju prostorom pod košem, pretežno u ulozi centara i krilnih centara\footnote{Krilni centar (eng. power forward) - pozicija između krila i centra, kombinuje snagu i pokretljivost}. Oni su sporiji u testovima agilnosti što je očekivani kompromis sa veličinom, ali ta razlika je minimaln (svega pola sekunde prosečno).
+\vspace{2pt}
+
+Međutim, interesantno je da su ovi visoki igrači u proseku slabiji u vertikalnom skoku. Ovaj nalaz je u skladu sa posmatranjima iz igre, budući da je sposobnost visokog skoka značajnija za igrače koji šutiraju sa veće distance, dok je njen značaj manji za igrače koji većinu vremena provode pod košem.
+\vspace{2pt}
+
+Klaster 0, sa prosečnom visinom od 195.15 cm i težinom od 89 kg, su spoljašnji igrači\footnote{Perimetralni/spoljašnji igrači - igrači koji većinu vremena provode na spoljašnjem delu terena, dalje od koša} u ulozi bekova i krila\footnote{Krilo (eng. forward) - pozicija između beka i centra, svestrani igrač koji igra i na perimetru i pod košem}. Njihova prednost nije u veličini već u brzini, agilnosti i često u eksplozivnosti. Ovo su igrači koji diktiraju tempo igre, organizuju napad, i čuvaju spoljašnji deo terena.
+
+\newpage
+\subsection{Alternativni pristupi klasterovanju}
+\label{subsec:ostali_algoritmi}
+
+Kako bi se proverilo da li su dobijeni rezultati specifični za K-Means algoritam, primenjeni su i alternativni pristupi klasterovanju. 
+\vspace{2pt}
+
+Hijerarhijsko klasterovanje, koje konstruiše dendrogram postupnim spajanjem najbližih klastera, rezultovalo je identičnom podelom na dve dominantne grupe. Ovakav ishod ukazuje da dobijena podela nije artefakt izabranog algoritma, već predstavlja robusnu strukturu prisutnu u podacima. Dobijeni skor siluete iznosio je 0.1368.
+\vspace{2pt}
+
+DBSCAN algoritam \cite{ester1996density}, zasnovan na identifikaciji regiona visoke gustine u prostoru podataka, dao je drugačiji rezultat, pri čemu je većina igrača svrstana u jedan veliki gusti klaster, uz manji broj izdvojenih netipičnih vrednosti. Ovakav nalaz sugeriše da podaci nisu jasno razdvojeni u gustinskom smislu, odnosno da ne postoje izražene \enquote{praznine} između grupa, već kontinuirani prelaz između fizičkih profila igrača, što je u skladu sa vizualizacijama prikazanim na slici~\ref{fig:pca_2d}. DBSCAN na taj način dodatno potvrđuje prethodne nalaze da se košarkaške pozicije mogu posmatrati kao kontinuum, a ne kao strogo diskretne kategorije. Ukupan broj tačaka označenih kao šum iznosio je 54.
+\vspace{2pt}
+
+Na osnovu ovih poređenja, K-Means algoritam, koji je ostvario najviši skor siluete i obezbedio najinterpretabilniju podelu, ostaje najpogodniji pristup za ovaj skup podataka i stoga je korišćen u daljim analizama.
+
+\newpage
+\section{Klasifikacija}
+\label{sec:klasifikacija}
+
+K-Means algoritam je identifikovao dva fizička arhetipa među NBA igračima. Sledeće pitanje je koliko je taj obrazac jasno definisan? Ako treniramo na modele mašinskog učenja da prepoznaju razliku između ta dva klastera, koliko uspešno to mogu uraditi?
+\vspace{2pt}
+
+Ako klasifikatori mogu sa velikom tačnošću razlikovati klastere, to potvrđuje da su klasteri dobro definisani i nisu proizvod slučajnosti. Ako tačnost bude niska, to bi sugerisalo da su klasteri veštački i da možda ne treba da im verujemo.
+\vspace{2pt}
+
+Za ovaj eksperiment, podaci su podeljeni na trening (70\%) i test skupove (30\%), i testirana su tri različita tipa algoritama: slučajna šuma \cite{breiman2001random}\footnote{Slučajna šuma - ansambl metoda zasnovana na kombinovanju više stabala odlučivanja} (eng. Random forest), mašina potpornih vektora (eng. Support Vector Machine (SVM))\footnote {SVM - algoritam koji pronalazi optimalnu granicu razdvajanja između klasa}, i neuronska mreža\footnote{Neuronska mreža - model inspirisan biološkim neuronima, višeslojna perceptronska mreža} (eng. Neural network). Svi modeli su implementirani korišćenjem biblioteke scikit-learn \cite{pedregosa2011scikit}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{Skup karakteristika} & \textbf{Tačnost}  \\
+\midrule
+Slučajna šuma & Pun skup (30 PC) & 98.15\% \\
+Slučajna šuma & Redukovani (10 PC) & 98.77\%  \\
+\midrule
+SVM (RBF jezgro) & Pun skup (30 PC) & 96.62\%  \\
+SVM (RBF jezgro) & Redukovani (10 PC) & 96.62\%  \\
+\midrule
+Neuronska mreža & Pun skup (30 PC) & 97.85\% \\
+Neuronska mreža & Redukovani (10 PC) & 99.08\%  \\
+\bottomrule
+\end{tabular}
+\caption{Performanse modela za predviđanje pripadnosti klasteru}
+\label{table:perfomanse_klasifikacije}
+\end{table}
+
+Rezultati su impresivni jer svi modeli postižu tačnost preko 96\%. Slučajna šuma greši u samo 1.85\% slučajeva kada koristi svih 30 komponenti, dok Neuronska mreža na redukciji od 10 komponenti dostiže gotovo savršenih 99.08\%. Ovo jasno potvrđuje da su klasteri koje je K-Means identifikovao ekstremno dobro definisani i jasno da modeli gotovo uvek mogu ispravno klasifikovati novog igrača.
+\vspace{2pt}
+
+Ali možda još interesantniji nalaz je to šta se dešava kada redukujemo broj karakteristika sa 30 na 10 koristeći PCA. Umesto očekivanog pada u performansama, vidimo poboljšanje. Slučajna šuma se poboljšava za 0.62\%, a Neuronska mreža čak za 1.23\%. 
+\vspace{2pt}
+
+Objašnjenje leži u konceptu \enquote{šuma u podacima}. Od naših 30 originalnih karakteristika, mnoge mere iste stvari ili su irelevantne za razlikovanje između ova dva arhetipa. PCA, fokusirajući se na 10 komponenti koje objašnjavaju najveći deo varijanse, efektivno filtrira ovaj šum. Modeli dobijaju čistiji signal i mogu donositi bolje odluke. 
+
+
+\subsection{Predviđanje Stvarnih Košarkaških Pozicija}
+\label{subsec:position_classification}
+
+Šta se dešava kada pokušamo da predvidimo stvarne košarkaške pozicije - bek, krilo i centar - samo na osnovu fizičkih merenja?
+\vspace{2pt}
+
+Ovaj zadatak je složeniji jer pozicije nisu striktno definisane fizičkim karakteristikama, dva igrača iste visine mogu igrati različite pozicije zavisno od veština koje poseduju. Ipak, očekivali bismo određenu prediktivnost jer visina i atletizam svakako utiču na to na kojoj poziciji će igrač biti najkorisniji.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Model} & \textbf{Tačnost} \\
+\midrule
+Slučajna šuma & 85.56\% \\
+SVM (RBF) & 80.28\% \\
+Neuronska mreža & 67.22\% \\
+\bottomrule
+\end{tabular}
+\caption{Performanse modela za klasifikaciju pozicije}
+\label{table:perfomanse_klasifikacija_pozicija}
+\end{table}
+
+Slučajna šuma postiže tačnost od 85.56\%, što je impresivno ali veoma niže od 98\% koje smo videli za klastere. Ova razlika nam govori da su fizičke karakteristike dobar ali ne i savršen prediktor pozicije.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/position_classification_confusion_matrix.png}
+\caption{Matrika konfuzije za klasifikaciju pozicije (Slučajna šuma)}
+\label{fig:position_confusion}
+\end{figure}
+
+Slika \ref{fig:position_confusion} otkriva gde model pravi greške. Pozicija beka se klasifikuje sa najvišom preciznošću sa 153 od 167 bekova koji su ispravno klasifikovani, što daje 91.6\% tačnost. Bekovi tipično imaju najjasnije fizičke karakteristike jer su manji, lakši, brži, pa rezultat ima smisla.
+\vspace{2pt}
+
+Pozicija centra takođe pokazuje dobru preciznost sa 10 od 32 ispravno klasifikovanih u ovoj relativno maloj klasi, mada se često brka sa krilo pozicijom. Pozicija krila ima najviše grešaka gde je 145 od 161 je ispravno klasifikovano (90.1\%), ali 21 krilni igrač je pogrešno klasifikovan kao centar, a 11 kao bek.
+\vspace{2pt}
+
+Ovo odražava realnost moderne košarke gde je krilo najfluidnija pozicija. Igrači na poziciji niskog krila mogu biti dovoljno brzi da igraju kao bek u nekim situacijama, dok igrači na poziciji krilnog centra mogu igrati kao centar. Ova fluidnost je jedna od karakteristika evolucije NBA igre u poslednjih 20 godina gde pozicije postaju sve manje rigidne, a igrači sve više igraju bez pozicije\footnote{Positionless basketball - moderni stil igre gde igrači nisu striktno vezani za jednu poziciju već mogu igrati više uloga}.
+
+\newpage
+\subsection{Predikcije Draft Statusa}
+\label{subsec:draft_status}
+
+Poslednji eksperiment testira možda najzanimljivije pitanje za NBA organizacije. Da li fizičke karakteristike mogu predvideti kako će igrač biti rangiran na draftu? Konkretno, može li model razlikovati igrače koji će biti izabrani u prvoj rundi (pozicije 1-30) od onih u drugoj rundi (pozicije 31-60)?
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Model} & \textbf{Tačnost} \\
+\midrule
+Slučajna šuma & 99.45\% \\
+SVM (RBF) & 94.18\% \\
+Neuronska mreža & 100.00\% \\
+\bottomrule
+\end{tabular}
+\caption{Performanse modela za klasifikaciju draft statusa}
+\label{table:perfomanse_klasifikacija_draft}
+\end{table}
+
+Neuronska mreža postiže savršenih 100\%, a Slučajna šuma greši u samo 2 od 363 slučaja. Postignuta tačnost je izuzetno visoka i stoga zahteva oprez pri interpretaciji.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/draft_status_confusion_matrix.png}
+\caption{Matrica konfuzije za klasifikaciju draft statusa (Slučajna šuma)}
+\label{fig:draft_confusion}
+\end{figure}
+
+Slika \ref{fig:draft_confusion} pokazuje matricu konfuzije koja je gotovo dijagonalna sa samo 2 greške od 361 predviđanja. Od 266 igrača iz prve runde, 264 je ispravno klasifikovano (99.2\%), dok je od 97 igrača iz druge runde, 95 ispravno klasifikovano (97.9\%).
+
+Postoji nekoliko mogućih interpretacija. Prva je da su fizičke karakteristike toliko važne da gotovo potpuno određuju kako će skauti rangirati igrače. Igrači draftovani u prvoj rundi su statistički superiorni po svim fizičkim metrikama, što sugeriše da NBA organizacije rade dobar posao evaluacije fizičkih talenta.
+
+Međutim, postoje i ograničenja ove interpretacije koja ne treba zanemariti. Skup podataka sadrži samo igrače koji su pozvani na probni kamp dok mnogi igrači iz druge runde ili nedraftovani nikada nisu ni testirani, što kreira veštačku separaciju. Takođe, može postojati neravnoteža u broju igrača između rundi (880 iz prve runde vs 322 iz druge u celom skupu podataka), što olakšava klasifikaciju.
+
+Uprkos ovim ograničenjima, rezultat jasno potvrđuje hipotezu da su fizičke karakteristike ekstremno prediktivne za rani uspeh u draft procesu. Ovo ne znači da veštine, košarkaški IQ i mentalni aspekti nisu važni, ali sugeriše da su fizički atributi primarni kriterijum selekcije koji NBA timovi koriste u ranoj fazi evaluacije.
+
+\newpage
+\section{Pravila Pridruživanja}
+\label{sec:pravila_pridruzivanja}
+
+% \subsection{Traganje za Skrivenim Povezanostima}
+% \label{subsec:apriori_uvod}
+
+Do sada smo koristili tehnike koje grupišu slične igrače ili predviđaju ishode. Ali postoji još jedan ugao analize i to je otkrivanje \enquote{pravila} koja povezuju različite fizičke karakteristike. Na primer, ako znamo da igrač ima visok vertikalni skok i dobru agilnost, šta još verovatno možemo očekivati od njega? 
+
+Za ovo koristimo Apriori algoritam \cite{agrawal1994fast}, tehniku iz oblasti otkrivanja asocijativnih pravila\footnote{Association rule mining - tehnika otkrivanja znanja koja pronalazi veze između stavki u velikim skupovima podataka}. Primenjena na naše podatke, može otkriti koji fizički atributi se konzistentno pojavljuju zajedno.
+
+Pre primene algoritma, kontinuirane numeričke karakteristike (poput visine ili telesne mase) diskretizovane su u kategorijske varijable. Svaka karakteristika podeljena je na tri nivoa i to \enquote{Low}, \enquote{Medium} i \enquote{High} na osnovu tercila raspodele, pri čemu donjih 33\% vrednosti pripada kategoriji \enquote{Low}, srednjih 33\% kategoriji \enquote{Medium}, a gornjih 33\% kategoriji \enquote{High}. Ovakva transformacija omogućava algoritmu da identifikuje asocijativne obrasce, kao što su veze između niske telesne mase, visokog vertikalnog skoka i povećane agilnosti.
+
+\subsection{Otkrića}
+\label{subsec:apriori_rezultati}
+
+Apriori\footnote{Apriori - algoritam za pronalaženje čestih skupova stavki i generisanje asocijativnih pravila} je pokrenut sa pragovima od 10\% za podršku (eng. support) (pravilo mora da se pojavi u bar 10\% slučajeva da bi bilo razmatrano) i 70\% za pouzdanost (eng. confidence) (ako je leva strana pravila istinita, desna strana mora biti istinita u bar 70\% slučajeva).
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Metrika} & \textbf{Vrednost} \\
+\midrule
+Ukupan broj transakcija & 1.202 \\
+Ukupan broj diskretnih stavki & 21 \\
+Identifikovanih čestih skupova predmeta & 203 \\
+Generisanih pravila & 129 \\
+Minimalna podrška & 0.10 \\
+Minimalna pouzdanost & 0.70 \\
+Prosečna pouzdanost & 0.786 \\
+Prosečni podizaj & 2.093 \\
+Maksimalni podizaj & 3.273 \\
+\bottomrule
+\end{tabular}
+\caption{Sumarni rezultati Apriori analize}
+\end{table}
+
+Algoritam je identifikovao ukupno 129 pravila koja zadovoljavaju oba kriterijuma. Prosečna vrednost pouzdanosti od 78.6\% ukazuje na to da su dobijena pravila robusna, jer ne predstavljaju slučajne korelacije, već stabilne i konzistentne obrasce u podacima. Mera \textbf{podizaj} (eng. lift) kvantifikuje u kojoj meri je pojava desne strane pravila verovatnija kada je leva strana ispunjena, u poređenju sa njenom ukupnom učestalošću. Najveća zabeležena vrednost podizaja od 3.273 označava asocijaciju koja je više od tri puta jača od one koja bi se očekivala slučajnim putem, što ukazuje na izuzetno snažno pravilo.
+
+\subsection{Najinteresantnija Pravila}
+\label{subsec:najznacajnija_pravila}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{5.5cm}p{4cm}cc}
+\toprule
+\textbf{Uslov (Antecedent)} & \textbf{Posledica (Consequent)} & \textbf{Pouzd.} & \textbf{Podizaj} \\
+\midrule
+Med Standing Vert + Med Agility & Med Max Vert & 0.931 & 3.273 \\
+Med Max Vert + Med Agility & Med Standing Vert & 0.856 & 3.225 \\
+Med Max Vert + Low Bench Press & Med Standing Vert & 0.739 & 2.784 \\
+Med Standing Vert + Med Max Vert & Med Agility & 0.852 & 2.639 \\
+High Weight + Low Standing Vert & Low Max Vert & 0.887 & 2.544 \\
+High Bench Press + High Max Vert & High Standing Vert & 0.892 & 2.466 \\
+\bottomrule
+\end{tabular}
+\caption{Prvih 6 pravila po vrednosti podizaja}
+\end{table}
+
+Najjače identifikovano pravilo (podizaj = 3.273) pokazuje da igrači sa prosečnim vertikalnim skokom iz mesta i prosečnim vremenom u testu agilnosti sa velikom verovatnoćom (93.1\% pouzdanost) imaju i prosečan maksimalni vertikalni skok. Vrednost lifta od 3.273 ukazuje da se ova kombinacija pojavljuje više od tri puta češće nego što bi se očekivalo pod pretpostavkom nezavisnosti karakteristika. Ovakav nalaz ukazuje na visok stepen konzistentnosti u atletskim performansama, budući da igrači koji ostvaruju prosečne rezultate u jednoj dimenziji eksplozivnosti teže da budu prosečni i u ostalim srodnim testovima.
+\vspace{2pt}
+
+Drugo pravilo predstavlja recipročan odnos u odnosu na prvo i dodatno potvrđuje uočenu konzistentnost atletskih sposobnosti. Treće pravilo otkriva interesantnu povezanost između eksplozivnosti donjih ekstremiteta i snage gornjeg dela tela: igrači sa prosečnim maksimalnim skokom i niskim rezultatima u testu potiska sa klupe i dalje ostvaruju prosečne vrednosti u vertikalnom skoku iz mesta. Ovakav obrazac sugeriše da eksplozivnost skoka ne zavisi direktno od snage gornjeg dela tela.
+\vspace{2pt}
+
+Peto pravilo potvrđuje očekivani kompromis između telesne mase i eksplozivnosti. Igrači sa visokom telesnom masom i niskim vertikalnim skokom iz mesta sa velikom verovatnoćom (88.7\%) ostvaruju i nizak maksimalni vertikalni skok. Ovaj nalaz je u skladu sa osnovnim biomehaničkim principima, prema kojima veća masa zahteva veću silu za postizanje iste visine skoka.
+\vspace{2pt}
+
+Šesto pravilo ukazuje da igrači koji kombinuju visoku eksplozivnost (maksimalni vertikalni skok) i visoku snagu (potisak sa klupe) najčešće ostvaruju dobre rezultate i u testu vertikalnog skoka iz mesta. 
+\vspace{5pt}
+
+Ukupno posmatrano, dobijena asocijativna pravila otkrivaju sistemske obrasce u fizičkim karakteristikama NBA igrača. Uočavaju se prirodni \enquote{paketi} osobina koje se pojavljuju zajedno, oblikovani kako fiziologijom ljudskog tela, tako i specifičnim zahtevima savremene košarkaške igre.
+
+\subsection{Praktična Primena Pravila}
+\label{subsec:implikacije_pravila}
+
+Otkrivena pravila imaju konkretne praktične primene. Prvo, mogu služiti za validaciju merenja. Na primer, ako igrač ima visoku težinu ali pokazuje visok vertikalni skok, to je neuobičajena kombinacija jer pravilo sa 88.7\% pouzdanošću predviđa suprotno. Ovakav slučaj može ukazivati na grešku u merenju ili na zaista izuzetnog kandidata koji zaslužuje dodatnu pažnju.
+\vspace{2pt}
+
+Drugo, pravila mogu pomoći u predviđanju nedostajućih vrednosti. Ako igrač nije učestvovao u testu maksimalnog vertikalnog skoka, ali ima prosečan vertikalni skok iz mesta i prosečnu agilnost, sa 93.1\% pouzdanošću možemo pretpostaviti da bi i maksimalni vertikalni skok bio u prosečnom opsegu.
+\vspace{2pt}
+
+Treće, pravila formalizuju kompromise između fizičkih karakteristika. Pravilo o visokoj težini i niskom skoku (podizaj = 2.544) kvantifikuje kompromis koji igrači na poziciji centra prave, žrtvujući eksplozivnost za fizičku dominaciju. Sa druge strane, pravilo o niskom potisku sa klupe i prosečnom skoku pokazuje da eksplozivnost nogu ne zahteva snagu gornjeg dela tela, što je relevantno za bekove koji mogu zanemariti taj aspekt treninga bez uticaja na njihovu sposobnost skakanja.
+\vspace{2pt}
+
+Konačno, pravila o konzistentnosti prosečnih vrednosti (prva četiri pravila sa vrednost podizajaima 2.6-3.3) sugerišu da većina igrača ima ujednačen atletski profil. Igrači retko imaju ekstremne vrednosti u jednoj dimenziji a prosečne u drugoj, što olakšava kategorizaciju i poređenje kandidata.
+
+\newpage
+\section{Vremenska Dimenzija}
+\label{sec:vremenske_serije}
+
+Jedan od jedinstvenih aspekata ovog skupa podataka jeste činjenica da obuhvata period duži od dve decenije (2000–2024). To omogućava ne samo analizu trenutnih fizičkih profila NBA draft kandidata, već i uvid u njihove promene kroz vreme. Postavlja se pitanje da li savremeni igrači postaju viši, brži i eksplozivniji, ili se osnovni fizički obrasci u velikoj meri zadržavaju nepromenjenim.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{figures/time_series_trends.png}
+\caption{Trendovi fizičkih karakteristika kroz sezone}
+\label{fig:time_series}
+\end{figure}
+
+Slika \ref{fig:time_series} prikazuje prosečne vrednosti četiri ključne metrike grupisane po sezonama. Ono što uočavamo je relativna stabilnost većine merenja jer nema dramatičnih skokova ili padova. Ovo nam govori da osnovni fizički zahtevi NBA košarke ostaju konzistentni, uprkos promenama u stilu igre.
+\vspace{2pt}
+
+Visina sa patikama osciluje oko 201 cm kroz ceo period bez jasnog trenda. Visina je biološki ograničena karakteristika i nije nešto što se može značajno promeniti treningom ili evolucijom sporta u kratkom periodu od 25 godina. NBA nastavlja da regrutuje igrače iz istog spektra visina jer su ti zahtevi najbitniji za sport.
+\vspace{2pt}
+
+Telesna masa pokazuje dinamičniji obrazac, sa oscilacijama između približno 94 i 99 kg tokom posmatranog perioda, uz blagi pad u poslednjim sezonama. Ovaj trend ka nižoj prosečnoj masi u skladu je sa evolucijom NBA igre ka bržem tempu, većem prostornom razmaku i snažnijem naglasku na perimetralnoj igri i šutiranju za tri poena. Savremeni igrači su u proseku pokretljiviji i vitkiji u poređenju sa igračima iz ranih 2000-ih, kada je igra bila sporija i više orijentisana ka igri leđima prema košu.
+\vspace{2pt}
+
+Raspon ruku ostaje relativno stabilan, u intervalu od približno 207 do 212 cm, bez jasno izraženog dugoročnog trenda. Ovakav nalaz je očekivan, budući da je raspon ruku, slično kao i visina, u velikoj meri genetski determinisana karakteristika i stoga ne pokazuje sistematske promene tokom kraćih vremenskih intervala.
+\vspace{2pt}
+
+Najizraženiju varijabilnost pokazuje vertikalni skok iz mesta. Njegov maksimum zabeležen je oko 2012. godine, sa prosečnim vrednostima većim od 76 cm, nakon čega sledi postepeni pad koji traje do oko 2021. godine, uz blag oporavak u kasnijim sezonama. Ovakav obrazac može imati više objašnjenja. Jedna od mogućnosti jeste da savremeni trenažni pristupi stavljaju veći akcenat na funkcionalnu snagu, izdržljivost i višedimenzionalnu pokretljivost, a manji na čistu eksplozivnost u skoku. Alternativno, može biti prisutan i selekcioni efekat, budući da neki od najperspektivnijih igrača u poslednjim godinama preskaču NBA Draft Combine, opredeljujući se za individualne treninge i testiranja direktno sa timovima.
+
+\subsection{Šta Ova Stabilnost Znači?}
+\label{subsec:zakljucak_vremenske}
+
+Možda najznačajniji nalaz vremenske analize upravo je uočena stabilnost fizičkih profila. Uprkos značajnim promenama u stilu igre kao što su prelazak ka strategijama sa manjim igračima\footnote{Small-ball - taktički pristup u kom tim koristi niže i brže igrače umesto tradicionalnih visokih centara}, porast značaja šuta za tri poena i povećanje tempa igre, fundamentalne fizičke karakteristike NBA draft kandidata ostaju relativno konzistentne. Ovakav nalaz sugeriše da, bez obzira na evoluciju taktika i strategija, osnovni fizički zahtevi košarke na najvišem nivou ostaju u velikoj meri nepromenjeni.
+\vspace{2pt}
+
+Blagi trend ka manjoj telesnoj masi u poslednjim godinama može se posmatrati kao odraz jednog aspekta savremene igre, u kojoj se veći prioritet daje pokretljivosti u odnosu na čistu snagu. Ipak, ova promena je postepena i umerena, a ne revolucionarna, što ukazuje da NBA nije prešla na potpuno drugačiji tip igrača, već na suptilnu adaptaciju unutar postojećeg spektra fizičkih profila.
+\vspace{2pt}
+
+Analiza takođe pokazuje da se godišnje draft klase prirodno razlikuju u pogledu fizičkih karakteristika i opšteg kvaliteta. Pojedine klase sadrže veći udeo visokih igrača, dok su druge izraženije po atletičnosti. Ove varijacije predstavljaju prirodnu posledicu stohastičke raspodele talenata i ne ukazuju na dugoročne strukturne trendove, već na godišnje oscilacije u populaciji draft kandidata.
+
+\newpage
+\section{Zaključak}
+\label{sec:zakljucak}
+
+Fizički profili NBA draft kandidata mogu se svesti na dve fundamentalne dimenzije: veličinu i atletizam. Od preko 30 merenja, svega deset glavnih komponenti objašnjava oko 90\% varijanse, dok je ostatak u velikoj meri redundantan. Uprkos popularnom narativu o \enquote{košarci bez pozicija}, klaster analiza otkriva dva jasna arhetipa koja i dalje dominiraju ligom.
+\vspace{2pt}
+
+Posebno značajan uvid ne leži u prosečnim vrednostima, već u odstupanjima. Autlajeri, igrači čije kombinacije atributa odstupaju od statističkih očekivanja su često upravo oni koji redefinišu igru i uvode nove stilove igre.
+
+\subsection{Ograničenja}
+\label{subsec:ogranicenja}
+
+Ova analiza obuhvata isključivo fizičke karakteristike i ne uključuje tehničke veštine, košarkaški IQ niti mentalnu čvrstinu - faktore koji su podjednako presudni za uspeh u ligi. Skup podataka sadrži samo igrače pozvane na NBA Draft Combine, dok mnogi međunarodni igrači i utvrđeni talenti ovaj događaj preskaču. Nedostatak podataka o šutiranju (preko 70\% nedostajućih vrednosti) ograničio je analizu jedne od ključnih veština moderne košarke. Konačno, korelacija između fizičkog profila i draft pozicije ne implicira kauzalnost; fizički atributi mogu biti posledica, a ne uzrok različitih razvojnih prilika.
+
+\subsection{Budući pravci}
+\label{subsec:buduci_pravci}
+
+Prirodni nastavak ovog istraživanja bio bi povezivanje podataka sa probnog kampa sa karijernim statistikama, kako bi se procenilo u kojoj meri fizički atributi zaista predviđaju dugoročni uspeh u ligi. Analiza po pozicijama mogla bi otkriti specifične optimalne profile za svaku ulogu. Vremensko praćenje igrača omogućilo bi praćenje promena fizičkih karakteristika tokom karijere i identifikaciju tipova igrača koji duže ostaju zdravi i funkcionalno sposobni.
+
+\subsection{Završna Refleksija}
+\label{subsec:finalna_refleksija}
+
+Ovaj projekat je demonstrirao moć pristupa zasnovanog na podacima u domenu gde tradicionalno dominira subjektivna procena i iskustvo. Pokazali smo da sofisticirane tehnike mašinskog učenja mogu otkriti obrasce i pravila koja nisu očigledna golim okom, i da ti obrasci imaju stvarnu prediktivnu moć.
+\vspace{2pt}
+
+Međutim, cilj nije bio da se zameni ljudska ekspertiza statističkim modelima, već da se dopuni. Najbolji rezultati dolaze iz kombinacije gde skauti koji razumeju košarku i igrače na dubokom nivou, podržani objektivnim analizama koje pomažu da se izbegnu pristranosti i prepoznaju skriveni obrasci.
+\vspace{2pt}
+
+Ključna lekcija je da složenost nije uvek bolja od jednostavnosti. Pokazali smo da 10 pažljivo odabranih dimenzija može biti informativnije od 30 korelisanih merenja. U eri velikih podataka, ponekad je najvažnije znati šta zanemariti. \enquote{Manje je više} nije samo dizajnerski princip, već je to i statistička realnost kada je u pitanju kvalitet podataka i robusnost zaključaka.
+\vspace{2pt}
+
+\newpage
+\addcontentsline{toc}{section}{Literatura}
+\bibliographystyle{unsrt}
+\bibliography{literatura}
+
+
+\section*{Zahvalnice}
+\addcontentsline{toc}{section}{Zahvalnice}
+
+Ovaj projekat je urađen u okviru kursa Istraživanje Podataka (IP2) na Matematičkom fakultetu, Univerzitet u Beogradu. NBA baza podataka je preuzeta sa Kaggle platforme. Posebna zahvalnost zajednici otvorenog koda za pružanje biblioteka mašinskog učenja (scikit-learn, pandas, numpy, matplotlib, seaborn, mlxtend) koje su omogućile ovu analizu. Zahvaljujem se profesoru i asistentima kursa na smernicama i podršci tokom realizacije projekta.
+
+\end{document}
